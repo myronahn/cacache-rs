@@ -3,6 +3,7 @@
 //! give you corrupted data, even if cache files get corrupted or manipulated.
 
 #![warn(missing_docs, missing_doc_code_examples)]
+#![feature(async_await)]
 
 pub use serde_json::Value;
 pub use ssri::Algorithm;
