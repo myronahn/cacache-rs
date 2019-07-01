@@ -17,5 +17,7 @@ pub mod ls;
 pub mod put;
 pub mod rm;
 
+pub mod async_get;
+
 pub use errors::Error;
 pub use index::Entry;
