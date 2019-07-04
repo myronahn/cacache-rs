@@ -34,6 +34,7 @@ walkdir = "2.2.7"
 either = "1.5.2"
 mkdirp = "1.0.0"
 async-std = { git = "ssh://git@github.com/stjepang/async-std" }
+async-pool = { git = "ssh://git@github.com/stjepang/async-std" }
 futures-preview = "0.3.0-alpha.16"
 
 [dev-dependencies]
