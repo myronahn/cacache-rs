@@ -5,6 +5,7 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use async_pool::lazy_blocking;
 use chownr;
 use digest::Digest;
 use either::{Left, Right};
@@ -74,6 +75,35 @@ pub fn insert(cache: &Path, key: &str, opts: PutOpts) -> Result<Integrity, Error
     })?;
 
     let mut buck = OpenOptions::new().create(true).append(true).open(&bucket)?;
+
+    write!(buck, "\n{}\t{}", hash_entry(&stringified), stringified)?;
+    chownr::chownr(&bucket, opts.uid, opts.gid)?;
+    Ok(opts
+        .sri
+        .or_else(|| "sha1-deadbeef".parse::<Integrity>().ok())
+        .unwrap())
+}
+
+pub async fn insert_async<'a>(cache: &'a Path, key: &'a str, opts: PutOpts) -> Result<Integrity, Error> {
+    let bucket = bucket_path(&cache, &key);
+    let tmpbucket = bucket.clone();
+    let PutOpts { uid, gid, .. } = opts;
+    lazy_blocking(async move {
+        let parent = tmpbucket.parent().unwrap();
+        if let Some(path) = mkdirp::mkdirp(parent)? {
+            chownr::chownr(&path, uid, gid)?;
+        }
+        Ok::<(), Error>(())
+    }).await?;
+    let stringified = serde_json::to_string(&SerializableEntry {
+        key: key.to_owned(),
+        integrity: opts.sri.clone().map(|x| x.to_string()),
+        time: opts.time.unwrap_or_else(now),
+        size: opts.size.unwrap_or(0),
+        metadata: opts.metadata.unwrap_or_else(|| json!(null)),
+    })?;
+
+    let mut buck = async_std::fs::OpenOptions::new().create(true).append(true).open(&bucket).await?;
 
     write!(buck, "\n{}\t{}", hash_entry(&stringified), stringified)?;
     chownr::chownr(&bucket, opts.uid, opts.gid)?;
