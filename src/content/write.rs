@@ -3,10 +3,9 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Mutex;
-use std::task::{Context, Poll};
 
-use async_pool::{Blocking, lazy_blocking, spawn_blocking};
 use async_std::fs as afs;
+use async_std::task::{blocking, Context, Poll};
 use futures::prelude::*;
 use ssri::{Algorithm, Integrity, IntegrityOpts};
 use tempfile::NamedTempFile;
@@ -60,7 +59,7 @@ pub struct AsyncWriter(Mutex<State>);
 
 enum State {
     Idle(Option<Inner>),
-    Busy(Blocking<State>),
+    Busy(blocking::JoinHandle<State>),
 }
 
 struct Inner {
@@ -184,8 +183,8 @@ impl AsyncWrite for AsyncWriter {
                         inner.buf[..buf.len()].copy_from_slice(buf);
 
                         // Start the operation asynchronously.
-                        *state = State::Busy(spawn_blocking(async move {
-                            let res = std::io::Write::write(&mut inner.tmpfile, &inner.buf);
+                        *state = State::Busy(blocking::spawn(async move {
+                            let res = inner.tmpfile.write(&mut inner.buf);
                             inner.last_op = Some(Operation::Write(res));
                             State::Idle(Some(inner))
                         }));
@@ -217,8 +216,8 @@ impl AsyncWrite for AsyncWriter {
                         let mut inner = opt.take().unwrap();
 
                         // Start the operation asynchronously.
-                        *state = State::Busy(spawn_blocking(async move {
-                            let res = std::io::Write::flush(&mut inner.tmpfile);
+                        *state = State::Busy(blocking::spawn(async move {
+                            let res = inner.tmpfile.flush();
                             inner.last_op = Some(Operation::Flush(res));
                             State::Idle(Some(inner))
                         }));
@@ -244,7 +243,7 @@ impl AsyncWrite for AsyncWriter {
                     };
 
                     // Start the operation asynchronously.
-                    *state = State::Busy(spawn_blocking(async move {
+                    *state = State::Busy(blocking::spawn(async move {
                         drop(inner);
                         State::Idle(None)
                     }));

@@ -5,7 +5,7 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use async_pool::lazy_blocking;
+use async_std::task::blocking;
 use chownr;
 use digest::Digest;
 use either::{Left, Right};
@@ -88,7 +88,7 @@ pub async fn insert_async<'a>(cache: &'a Path, key: &'a str, opts: PutOpts) -> R
     let bucket = bucket_path(&cache, &key);
     let tmpbucket = bucket.clone();
     let PutOpts { uid, gid, .. } = opts;
-    lazy_blocking(async move {
+    blocking::spawn(async move {
         let parent = tmpbucket.parent().unwrap();
         if let Some(path) = mkdirp::mkdirp(parent)? {
             chownr::chownr(&path, uid, gid)?;
