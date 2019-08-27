@@ -127,7 +127,7 @@ impl Put {
     /// verifies data against `size` and `integrity` options, if provided.
     /// Must be called manually in order to complete the writing process,
     /// otherwise everything will be thrown out.
-    pub fn commit(self) -> Result<Integrity, Error> {
+    pub fn commit(mut self) -> Result<Integrity, Error> {
         let writer_sri = self.writer.close()?;
         if let Some(sri) = &self.opts.sri {
             // TODO - ssri should have a .matches method
@@ -141,6 +141,7 @@ impl Put {
                 return Err(Error::IntegrityError);
             }
         }
+        self.opts.sri = Some(writer_sri.clone());
         if let Some(size) = self.opts.size {
             if size != self.written {
                 return Err(Error::SizeError);
